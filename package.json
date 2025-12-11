@@ -1,0 +1,55 @@
+{
+  "name": "booking-automation",
+  "version": "1.0.0",
+  "description": "Booking.com automation with Playwright",
+  "author": "Nguyen Duc Tai",
+  "main": "server.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:chrome": "playwright test --project=chromium --headed",
+    "server": "node server.js",
+    "ui": "cd ui && npm run dev",
+    "dev": "concurrently \"npm run server\" \"npm run ui\"",
+    "build:ui": "cd ui && npm run build",
+    "prebuild": "npm run build:ui",
+    "build": "pkg . --out-path dist",
+    "build:win": "pkg . --targets node18-win-x64 --out-path dist"
+  },
+  "keywords": [
+    "playwright",
+    "automation",
+    "booking"
+  ],
+  "license": "ISC",
+  "bin": "server.js",
+  "pkg": {
+    "scripts": [
+      "src/**/*.js",
+      "server.js",
+      "index.js"
+    ],
+    "assets": [
+      "ui/dist/**/*",
+      "node_modules/playwright-core/**/*.js",
+      "node_modules/playwright/**/*.js"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^24.10.2",
+    "pkg": "^5.8.1"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "playwright": "^1.57.0"
+  }
+}
