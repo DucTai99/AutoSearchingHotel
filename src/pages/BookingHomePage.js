@@ -1,4 +1,4 @@
-const { sleep, scrollSmooth } = require("../utils/helpers.js");
+const { scrollSmooth } = require("../utils/helpers.js");
 const { SELECTORS, TIMEOUTS } = require("../config/constants.js");
 
 class BookingHomePage {
@@ -7,136 +7,149 @@ class BookingHomePage {
   }
 
   async closePopupIfPresent() {
-    try {
-      const closePopup = this.page.locator(SELECTORS.CLOSE_POPUP);
-      if (await closePopup.isVisible({ timeout: TIMEOUTS.SHORT })) {
-        await sleep(TIMEOUTS.SHORT);
-        await closePopup.click();
-      }
-    } catch (e) {
-      // Popup not present
-    }
+    await this.page.waitForTimeout(TIMEOUTS.SHORT);
+    await this.page.getByLabel("Bỏ qua phần đăng nhập").click();
   }
 
   async selectRegion(region) {
-    const destinationContainer = this.page.locator(
-      SELECTORS.DESTINATION_CONTAINER
-    );
-    if (await destinationContainer.isVisible({ timeout: TIMEOUTS.SHORT })) {
-      await sleep(TIMEOUTS.SHORT);
-      await destinationContainer.click();
+    try {
+      const destination = await this.page.getByLabel("Bạn muốn đến đâu?");
+      await destination.click();
+      await this.page.waitForTimeout(TIMEOUTS.SHORT);
+      await destination.pressSequentially(region, { delay: 1000 });
+      await this.page.waitForTimeout(TIMEOUTS.SHORT);
 
-      const autocompleteResults = this.page.locator(
-        SELECTORS.AUTOCOMPLETE_RESULTS
-      );
-      if (await autocompleteResults.isVisible({ timeout: TIMEOUTS.SHORT })) {
-        const listItems = autocompleteResults.locator("li");
-        const count = await listItems.count();
+      // Wait for autocomplete results and click the first option
+      const firstOption = this.page
+        .locator('[data-testid="autocomplete-results-options"] li')
+        .first();
+      await firstOption.waitFor({ state: "visible", timeout: 5000 });
+      await firstOption.click();
 
-        for (let i = 0; i < count; i++) {
-          const itemText = await listItems.nth(i).textContent();
-          const firstLine = itemText.split("\n")[0];
-          if (firstLine.toLowerCase() === region.toLowerCase()) {
-            await sleep(TIMEOUTS.SHORT);
-            await listItems.nth(i).click();
-            return true;
-          }
-        }
-      }
+      await this.page.waitForTimeout(TIMEOUTS.SHORT);
+      return true;
+    } catch (error) {
+      return false;
     }
-    return false;
   }
 
   async configureDates() {
-    await sleep(1000);
-    await scrollSmooth(this.page, 250);
+    // Random number of days: 2, 3, or 7
+    const daysOptions = [2, 3, 7];
+    const randomDays =
+      daysOptions[Math.floor(Math.random() * daysOptions.length)];
+    const checkInDate = this.getRandomDateInRange();
+    const checkOutDate = new Date(checkInDate);
+    checkOutDate.setDate(checkInDate.getDate() + randomDays);
 
-    const datePicker = this.page.locator(SELECTORS.DATE_PICKER);
-    if (await datePicker.isVisible({ timeout: TIMEOUTS.SHORT })) {
-      await sleep(TIMEOUTS.SHORT);
-      await datePicker.click();
+    console.log(`Check-in: ${this.formatVietnameseDate(checkInDate)}`);
+    console.log(
+      `Check-out: ${this.formatVietnameseDate(
+        checkOutDate
+      )} (${randomDays} days)`
+    );
 
-      const flexibleDatesDays = this.page.locator(
-        SELECTORS.FLEXIBLE_DATES_DAYS
-      );
-      if (await flexibleDatesDays.isVisible({ timeout: TIMEOUTS.SHORT })) {
-        const dateDayButtons = flexibleDatesDays.locator(
-          SELECTORS.FLEXIBLE_DATES_DAY
-        );
-        await sleep(TIMEOUTS.SHORT);
-        await dateDayButtons.nth(1).click();
-
-        const regionElement = this.page.locator('[role="region"]');
-        if (await regionElement.isVisible({ timeout: TIMEOUTS.SHORT })) {
-          const monthItems = regionElement.locator("li");
-          await sleep(TIMEOUTS.SHORT);
-          await monthItems.nth(0).click();
-          await sleep(TIMEOUTS.SHORT);
-          await monthItems.nth(1).click();
-        }
-
-        const dateFooter = this.page.locator(SELECTORS.FLEXIBLE_DATES_FOOTER);
-        if (await dateFooter.isVisible({ timeout: TIMEOUTS.SHORT })) {
-          const selectButton = dateFooter.locator(".. >> button").first();
-          await sleep(TIMEOUTS.SHORT);
-          await selectButton.click();
-
-          const submitButton = this.page.locator(SELECTORS.SUBMIT_BUTTON);
-          if (await submitButton.isVisible({ timeout: TIMEOUTS.SHORT })) {
-            await sleep(TIMEOUTS.SHORT);
-            await submitButton.click();
-          }
-        }
-      }
-    }
+    await this.page
+      .getByRole("button", { name: this.formatVietnameseDate(checkInDate) })
+      .click();
+    await this.page.waitForTimeout(TIMEOUTS.SHORT);
+    await this.page
+      .getByRole("button", { name: this.formatVietnameseDate(checkOutDate) })
+      .click();
+    await this.page.waitForTimeout(TIMEOUTS.SHORT);
+    await this.page.getByTestId("occupancy-config").click();
+    await this.page.waitForTimeout(TIMEOUTS.SHORT);
+    await this.page.getByRole("button", { name: "Xong" }).click();
+    await this.page.waitForTimeout(TIMEOUTS.SHORT);
+    await this.page.getByRole("button", { name: "Tìm" }).click();
   }
 
-  async searchForHotel(hotelName, maxPages) {
+  async searchForHotel(hotelName) {
     let hasHotel = false;
-    let pageCount = 1;
+    let scrollAttempts = 0;
+    const maxScrollAttempts = 100; // Maximum scroll attempts for infinity scroll
 
-    while (pageCount <= maxPages && !hasHotel) {
-      await sleep(TIMEOUTS.MEDIUM);
+    while (scrollAttempts < maxScrollAttempts && !hasHotel) {
+      // Check if hotel exists in current view
+      const hotelTitle = this.page.locator(
+        `[data-testid="title"]:has-text("${hotelName}")`
+      );
 
-      const assertiveElement = this.page.locator(SELECTORS.ASSERTIVE_LIVE);
-      if (await assertiveElement.isVisible({ timeout: TIMEOUTS.SHORT })) {
-        const scrollHeight = await this.page.evaluate(
-          () => document.documentElement.scrollHeight
+      if (await hotelTitle.isVisible({ timeout: 1000 }).catch(() => false)) {
+        hasHotel = true;
+        await hotelTitle.scrollIntoViewIfNeeded();
+        await this.page.waitForTimeout(TIMEOUTS.SHORT);
+
+        // Find and click the parent hotel card link
+        const hotelCard = hotelTitle.locator(
+          'xpath=ancestor::div[@data-testid="property-card"]'
         );
-        await scrollSmooth(this.page, scrollHeight - 500);
+        const hotelLink = hotelCard.locator(SELECTORS.TITLE_LINK);
+        await hotelLink.click();
+        return true;
+      }
 
-        const hotelCards = this.page.locator(SELECTORS.PROPERTY_CARD);
-        const hotelCount = await hotelCards.count();
+      // Check for "Load more results" button
+      const loadMoreButton = this.page.getByRole("button", {
+        name: "Tải thêm kết quả",
+      });
+      if (
+        await loadMoreButton.isVisible({ timeout: 1000 }).catch(() => false)
+      ) {
+        console.log("Clicking 'Load more results' button");
+        await loadMoreButton.click();
+        await this.page.waitForTimeout(TIMEOUTS.LONG); // Wait for new content to load
+        continue; // Skip scrolling and check for hotel again
+      }
 
-        for (let i = 0; i < hotelCount; i++) {
-          const hotelCard = hotelCards.nth(i);
-          const hotelLink = hotelCard.locator(SELECTORS.TITLE_LINK);
-          const linkText = await hotelLink.textContent();
-          const hotelTitle = linkText.split("\n")[0];
+      // Scroll down smoothly to load more hotels (infinity scroll)
+      await scrollSmooth(this.page, 800);
+      await this.page.waitForTimeout(1500); // Wait for new content to load
 
-          if (hotelTitle.toLowerCase() === hotelName.toLowerCase()) {
-            hasHotel = true;
-            await hotelLink.scrollIntoViewIfNeeded();
-            await sleep(TIMEOUTS.SHORT);
-            await hotelLink.click();
-            return true;
-          }
-        }
+      scrollAttempts++;
 
-        if (!hasHotel) {
-          const nextButton = this.page.locator(SELECTORS.NEXT_PAGE);
-          if (await nextButton.isVisible({ timeout: 1000 })) {
-            await sleep(1000);
-            await nextButton.click();
-            pageCount++;
-          } else {
-            break;
-          }
-        }
+      // Check if we've reached the bottom
+      const isAtBottom = await this.page.evaluate(() => {
+        return (
+          window.innerHeight + window.scrollY >=
+          document.documentElement.scrollHeight - 100
+        );
+      });
+
+      if (isAtBottom) {
+        console.log("Reached bottom of page, hotel not found");
+        break;
       }
     }
 
     return hasHotel;
+  }
+
+  getRandomDateInRange() {
+    const today = new Date();
+    const endOfNextMonth = new Date(
+      today.getFullYear(),
+      today.getMonth() + 2,
+      0
+    );
+    endOfNextMonth.setDate(endOfNextMonth.getDate() - 23);
+
+    // Random date between today and end of next month (minus 23 days)
+    const randomTime =
+      today.getTime() +
+      Math.random() * (endOfNextMonth.getTime() - today.getTime());
+    const randomDate = new Date(randomTime);
+
+    return randomDate;
+  }
+
+  formatVietnameseDate(date) {
+    const daysOfWeek = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    const dayOfWeek = daysOfWeek[date.getDay()];
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+
+    return `${dayOfWeek} ${day} tháng ${month}`;
   }
 }
 

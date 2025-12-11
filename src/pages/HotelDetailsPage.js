@@ -1,4 +1,4 @@
-const { sleep, scrollSmooth } = require("../utils/helpers.js");
+const { scrollSmooth } = require("../utils/helpers.js");
 const { SELECTORS, TIMEOUTS } = require("../config/constants.js");
 
 class HotelDetailsPage {

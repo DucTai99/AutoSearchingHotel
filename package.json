@@ -10,8 +10,10 @@
     "test:ui": "playwright test --ui",
     "test:chrome": "playwright test --project=chromium --headed",
     "server": "node server.js",
+    "server:watch": "nodemon server.js",
     "ui": "cd ui && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run ui\"",
+    "devwatch": "concurrently \"npm run server:watch\" \"npm run ui\"",
     "build:ui": "cd ui && npm run build",
     "prebuild": "npm run build:ui",
     "build": "pkg . --out-path dist",
@@ -43,6 +45,7 @@
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "@types/node": "^24.10.2",
+    "nodemon": "^3.0.2",
     "pkg": "^5.8.1"
   },
   "dependencies": {

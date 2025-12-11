@@ -5,7 +5,7 @@ async function sleep(ms) {
 async function scrollSmooth(page, scrollView) {
   const steps = Math.floor(scrollView / 2);
   for (let i = 0; i < steps; i++) {
-    await sleep(1);
+    await page.waitForTimeout(1);
     await page.evaluate(() => window.scrollBy(0, 2));
   }
 }
@@ -19,4 +19,4 @@ async function isElementVisible(page, selector, timeout = 2000) {
   }
 }
 
-module.exports = { sleep, scrollSmooth, isElementVisible };
+module.exports = { scrollSmooth, isElementVisible };

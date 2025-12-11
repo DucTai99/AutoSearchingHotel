@@ -3,8 +3,8 @@ import "./App.css";
 
 function App() {
   const [formData, setFormData] = useState({
-    hotelName: "",
-    region: "",
+    hotelName: "Thanh Thanh Hotel",
+    region: "Huế",
     numberPageWillFind: "1",
   });
   const [loading, setLoading] = useState(false);

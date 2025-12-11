@@ -2,6 +2,10 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const SearchService = require("./src/services/SearchService.js");
+const { ensurePlaywrightBrowsers } = require("./src/utils/browserSetup.js");
+
+// Check and install Playwright browsers if needed
+ensurePlaywrightBrowsers();
 
 const app = express();
 const port = 3001;
@@ -16,26 +20,23 @@ const searchService = new SearchService();
 
 app.post("/api/search", async (req, res) => {
   try {
-    const { hotelName, region, numberPageWillFind } = req.body;
+    const { hotelName, region } = req.body;
 
-    if (!hotelName || !region || !numberPageWillFind) {
+    if (!hotelName || !region) {
       return res.status(400).json({
         success: false,
-        message:
-          "Missing required parameters: hotelName, region, numberPageWillFind",
+        message: "Missing required parameters: hotelName, region",
       });
     }
 
     console.log("Starting automation search with:", {
       hotelName,
       region,
-      numberPageWillFind,
     });
 
     const result = await searchService.executeAutomationSearching(
       hotelName,
-      region,
-      parseInt(numberPageWillFind)
+      region
     );
 
     res.json({
