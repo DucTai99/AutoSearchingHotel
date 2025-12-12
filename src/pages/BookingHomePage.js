@@ -7,8 +7,14 @@ class BookingHomePage {
   }
 
   async closePopupIfPresent() {
-    await this.page.waitForTimeout(TIMEOUTS.SHORT);
-    await this.page.getByLabel("Bỏ qua phần đăng nhập").click();
+    try {
+      await this.page.waitForTimeout(TIMEOUTS.SHORT);
+      const closeButton = this.page.getByLabel("Bỏ qua phần đăng nhập");
+      await closeButton.waitFor({ state: "visible", timeout: 5000 });
+      await closeButton.click();
+    } catch (error) {
+      console.log("Popup not found or already closed, continuing...");
+    }
   }
 
   async selectRegion(region) {
@@ -67,7 +73,9 @@ class BookingHomePage {
   async searchForHotel(hotelName) {
     let hasHotel = false;
     let scrollAttempts = 0;
+    let loadMoreClicks = 0;
     const maxScrollAttempts = 100; // Maximum scroll attempts for infinity scroll
+    const maxLoadMoreClicks = 5; // Maximum times to click "Load more" button
 
     while (scrollAttempts < maxScrollAttempts && !hasHotel) {
       // Check if hotel exists in current view
@@ -96,10 +104,20 @@ class BookingHomePage {
       if (
         await loadMoreButton.isVisible({ timeout: 1000 }).catch(() => false)
       ) {
-        console.log("Clicking 'Load more results' button");
-        await loadMoreButton.click();
-        await this.page.waitForTimeout(TIMEOUTS.LONG); // Wait for new content to load
-        continue; // Skip scrolling and check for hotel again
+        if (loadMoreClicks < maxLoadMoreClicks) {
+          console.log(
+            `Clicking 'Load more results' button (${
+              loadMoreClicks + 1
+            }/${maxLoadMoreClicks})`
+          );
+          await loadMoreButton.click();
+          loadMoreClicks++;
+          await this.page.waitForTimeout(TIMEOUTS.LONG); // Wait for new content to load
+          continue; // Skip scrolling and check for hotel again
+        } else {
+          console.log("Reached maximum load more clicks, hotel not found");
+          break;
+        }
       }
 
       // Scroll down smoothly to load more hotels (infinity scroll)

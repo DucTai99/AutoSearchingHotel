@@ -1,14 +1,36 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 
 function App() {
   const [formData, setFormData] = useState({
     hotelName: "Thanh Thanh Hotel",
-    region: "Huế",
-    numberPageWillFind: "1",
+    region: "Đà Lạt",
   });
-  const [loading, setLoading] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [stats, setStats] = useState({
+    total: 0,
+    success: 0,
+    failed: 0,
+  });
   const [result, setResult] = useState(null);
+
+  // Poll for stats when search is running
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch("http://localhost:3001/api/search/stats");
+        const data = await response.json();
+        setStats(data.stats);
+        setIsRunning(data.isRunning);
+      } catch (error) {
+        console.error("Failed to fetch stats:", error);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isRunning]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -18,13 +40,12 @@ function App() {
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleStart = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setResult(null);
 
     try {
-      const response = await fetch("http://localhost:3001/api/search", {
+      const response = await fetch("http://localhost:3001/api/search/start", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -33,15 +54,42 @@ function App() {
       });
 
       const data = await response.json();
-      setResult(data);
+      if (data.success) {
+        setIsRunning(true);
+        setStats(data.stats);
+        setResult({
+          success: true,
+          message: "Repeat search started successfully",
+        });
+      } else {
+        setResult(data);
+      }
     } catch (error) {
       setResult({
         success: false,
         message: "Failed to connect to server",
         error: error.message,
       });
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const handleStop = async () => {
+    try {
+      const response = await fetch("http://localhost:3001/api/search/stop", {
+        method: "POST",
+      });
+
+      const data = await response.json();
+      setResult({
+        success: data.success,
+        message: data.message,
+      });
+    } catch (error) {
+      setResult({
+        success: false,
+        message: "Failed to stop search",
+        error: error.message,
+      });
     }
   };
 
@@ -49,9 +97,9 @@ function App() {
     <div className="App">
       <div className="container">
         <h1>Hotel Search Automation</h1>
-        <p className="subtitle">Automated hotel search using Playwright</p>
+        <p className="subtitle"></p>
 
-        <form onSubmit={handleSubmit} className="search-form">
+        <form onSubmit={handleStart} className="search-form">
           <div className="form-group">
             <label htmlFor="hotelName">Hotel Name</label>
             <input
@@ -62,7 +110,7 @@ function App() {
               onChange={handleInputChange}
               placeholder="Enter hotel name"
               required
-              disabled={loading}
+              disabled={isRunning}
             />
           </div>
 
@@ -74,40 +122,57 @@ function App() {
               name="region"
               value={formData.region}
               onChange={handleInputChange}
-              placeholder="Enter region (e.g., London, Paris)"
+              placeholder="Enter region (e.g., Đà Lạt, Huế)"
               required
-              disabled={loading}
+              disabled={isRunning}
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="numberPageWillFind">
-              Number of Pages to Search
-            </label>
-            <input
-              type="number"
-              id="numberPageWillFind"
-              name="numberPageWillFind"
-              value={formData.numberPageWillFind}
-              onChange={handleInputChange}
-              min="1"
-              max="10"
-              required
-              disabled={loading}
-            />
-          </div>
+          <div className="button-group">
+            <button type="submit" className="submit-btn" disabled={isRunning}>
+              {isRunning ? (
+                <>
+                  <span className="spinner"></span>
+                  Running...
+                </>
+              ) : (
+                "Start Search"
+              )}
+            </button>
 
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? (
-              <>
-                <span className="spinner"></span>
-                Searching...
-              </>
-            ) : (
-              "Start Search"
+            {isRunning && (
+              <button type="button" className="stop-btn" onClick={handleStop}>
+                Stop After Current
+              </button>
             )}
-          </button>
+          </div>
         </form>
+
+        {(stats.total > 0 || isRunning) && (
+          <div className="stats-container">
+            <h3>Statistics</h3>
+            <div className="stats-grid">
+              <div className="stat-item">
+                <span className="stat-label">Total Runs:</span>
+                <span className="stat-value">{stats.total}</span>
+              </div>
+              <div className="stat-item success">
+                <span className="stat-label">Success:</span>
+                <span className="stat-value">{stats.success}</span>
+              </div>
+              <div className="stat-item failed">
+                <span className="stat-label">Failed:</span>
+                <span className="stat-value">{stats.failed}</span>
+              </div>
+            </div>
+            {isRunning && (
+              <div className="status-indicator">
+                <span className="pulse"></span>
+                <span>Search is running...</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {result && (
           <div className={`result ${result.success ? "success" : "error"}`}>
