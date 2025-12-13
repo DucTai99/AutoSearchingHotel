@@ -6,11 +6,8 @@ const {
   Button,
 } = require("@nut-tree-fork/nut-js");
 const { exec } = require("child_process");
-const { promisify } = require("util");
 const { sleep } = require("../utils/helpers.js");
 const { TIMEOUTS } = require("../config/constants.js");
-
-const execAsync = promisify(exec);
 
 class OpenAppService {
   constructor() {
@@ -98,11 +95,13 @@ class OpenAppService {
   async clickAtPosition(x, y) {
     try {
       console.log(`Clicking at position: ${x}, ${y}`);
-
+      await sleep(TIMEOUTS.SHORT);
       await mouse.setPosition({ x, y });
+      await sleep(TIMEOUTS.SHORT);
       await mouse.click(Button.LEFT);
 
       console.log("Position clicked successfully");
+      await sleep(TIMEOUTS.LONG);
       return true;
     } catch (error) {
       console.error("Error clicking position:", error);

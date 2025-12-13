@@ -26,9 +26,10 @@ const openAppService = new OpenAppService();
 
 // Get configuration from environment variables
 const APP_PATH = process.env.APP_PATH || "";
-const BUTTON_TEXT = process.env.BUTTON_TEXT || "";
 const DEFAULT_HOTEL_NAME = process.env.HOTEL_NAME || "Thanh Thanh Hotel";
 const DEFAULT_REGION = process.env.REGION || "Đà Lạt";
+const BUTTON_X = process.env.BUTTON_X || "";
+const BUTTON_Y = process.env.BUTTON_Y || "";
 
 // Repeat search state
 let repeatState = {
@@ -59,23 +60,23 @@ async function executeSingleSearch(hotelName, region) {
 // Function to run repeat search loop
 async function runRepeatSearch() {
   while (repeatState.isRunning && !repeatState.shouldStop) {
-    const { hotelName, region, appPath, buttonText } =
+    const { hotelName, region, appPath, buttonX, buttonY } =
       repeatState.currentConfig;
     repeatState.stats.total++;
 
     console.log(`Starting search iteration ${repeatState.stats.total}...`);
 
     // Open desktop app and click button if configured
-    if (appPath && buttonText) {
+    if (appPath && buttonX && buttonY) {
       console.log("Opening desktop application...");
       await openAppService.goToDesktop();
       const appOpened = await openAppService.openApplication(appPath, 3000);
 
       if (appOpened) {
         await sleep(TIMEOUTS.SHORT);
-        const buttonClicked = await openAppService.clickButtonByText(
-          buttonText,
-          10000
+        const buttonClicked = await openAppService.clickAtPosition(
+          parseInt(buttonX),
+          parseInt(buttonY)
         );
         if (buttonClicked) {
           console.log("Button clicked in application");
@@ -110,7 +111,7 @@ async function runRepeatSearch() {
 
 app.post("/api/search/start", async (req, res) => {
   try {
-    const { hotelName, region } = req.body;
+    const { hotelName, region, buttonX, buttonY } = req.body;
 
     if (!hotelName || !region) {
       return res.status(400).json({
@@ -134,7 +135,8 @@ app.post("/api/search/start", async (req, res) => {
       hotelName,
       region,
       appPath: APP_PATH,
-      buttonText: BUTTON_TEXT,
+      buttonX: buttonX || BUTTON_X,
+      buttonY: buttonY || BUTTON_Y,
     };
 
     // Start the repeat search in background
@@ -186,6 +188,8 @@ app.get("/api/config", (req, res) => {
   res.json({
     hotelName: DEFAULT_HOTEL_NAME,
     region: DEFAULT_REGION,
+    buttonX: BUTTON_X,
+    buttonY: BUTTON_Y,
   });
 });
 
