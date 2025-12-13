@@ -3,8 +3,8 @@ import "./App.css";
 
 function App() {
   const [formData, setFormData] = useState({
-    hotelName: "Thanh Thanh Hotel",
-    region: "Đà Lạt",
+    hotelName: "",
+    region: "",
   });
   const [isRunning, setIsRunning] = useState(false);
   const [stats, setStats] = useState({
@@ -13,6 +13,23 @@ function App() {
     failed: 0,
   });
   const [result, setResult] = useState(null);
+
+  // Load default values from server on mount
+  useEffect(() => {
+    const loadDefaults = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/api/config");
+        const data = await response.json();
+        setFormData({
+          hotelName: data.hotelName,
+          region: data.region,
+        });
+      } catch (error) {
+        console.error("Failed to load default config:", error);
+      }
+    };
+    loadDefaults();
+  }, []);
 
   // Poll for stats when search is running
   useEffect(() => {

@@ -1,8 +1,13 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const SearchService = require("./src/services/SearchService.js");
+const OpenAppService = require("./src/services/OpenAppService.js");
 const { ensurePlaywrightBrowsers } = require("./src/utils/browserSetup.js");
+const { TIMEOUTS } = require("./src/config/constants.js");
+const { sleep } = require("./src/utils/helpers.js");
 
 // Check and install Playwright browsers if needed
 ensurePlaywrightBrowsers();
@@ -17,6 +22,13 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "ui", "dist")));
 
 const searchService = new SearchService();
+const openAppService = new OpenAppService();
+
+// Get configuration from environment variables
+const APP_PATH = process.env.APP_PATH || "";
+const BUTTON_TEXT = process.env.BUTTON_TEXT || "";
+const DEFAULT_HOTEL_NAME = process.env.HOTEL_NAME || "Thanh Thanh Hotel";
+const DEFAULT_REGION = process.env.REGION || "Đà Lạt";
 
 // Repeat search state
 let repeatState = {
@@ -47,11 +59,40 @@ async function executeSingleSearch(hotelName, region) {
 // Function to run repeat search loop
 async function runRepeatSearch() {
   while (repeatState.isRunning && !repeatState.shouldStop) {
-    const { hotelName, region } = repeatState.currentConfig;
+    const { hotelName, region, appPath, buttonText } =
+      repeatState.currentConfig;
     repeatState.stats.total++;
 
     console.log(`Starting search iteration ${repeatState.stats.total}...`);
+
+    // Open desktop app and click button if configured
+    if (appPath && buttonText) {
+      console.log("Opening desktop application...");
+      await openAppService.goToDesktop();
+      const appOpened = await openAppService.openApplication(appPath, 3000);
+
+      if (appOpened) {
+        await sleep(TIMEOUTS.SHORT);
+        const buttonClicked = await openAppService.clickButtonByText(
+          buttonText,
+          10000
+        );
+        if (buttonClicked) {
+          console.log("Button clicked in application");
+          await sleep(TIMEOUTS.LONG);
+        } else {
+          console.log("Failed to click button in application");
+        }
+      }
+    }
+
     const result = await executeSingleSearch(hotelName, region);
+
+    // Close the app after search completes
+    if (appPath) {
+      const appName = path.basename(appPath);
+      await openAppService.closeApplication(appName);
+    }
 
     if (result) {
       repeatState.stats.success++;
@@ -89,9 +130,12 @@ app.post("/api/search/start", async (req, res) => {
     repeatState.isRunning = true;
     repeatState.shouldStop = false;
     repeatState.stats = { total: 0, success: 0, failed: 0 };
-    repeatState.currentConfig = { hotelName, region };
-
-    console.log("Starting repeat search with:", { hotelName, region });
+    repeatState.currentConfig = {
+      hotelName,
+      region,
+      appPath: APP_PATH,
+      buttonText: BUTTON_TEXT,
+    };
 
     // Start the repeat search in background
     runRepeatSearch();
@@ -135,6 +179,13 @@ app.get("/api/search/stats", (req, res) => {
     isRunning: repeatState.isRunning,
     stats: repeatState.stats,
     currentConfig: repeatState.currentConfig,
+  });
+});
+
+app.get("/api/config", (req, res) => {
+  res.json({
+    hotelName: DEFAULT_HOTEL_NAME,
+    region: DEFAULT_REGION,
   });
 });
 

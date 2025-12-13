@@ -19,4 +19,4 @@ async function isElementVisible(page, selector, timeout = 2000) {
   }
 }
 
-module.exports = { scrollSmooth, isElementVisible };
+module.exports = { sleep, scrollSmooth, isElementVisible };
